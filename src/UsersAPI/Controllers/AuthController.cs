@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +16,7 @@ public sealed class AuthController(UsersDbContext db, IConfiguration cfg) : Cont
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginRequest r)
     {
-        var u = await db.Users.SingleOrDefaultAsync(x => x.Email == r.Email.ToLower());
+        var u = await db.Users.SingleOrDefaultAsync(x => x.Email == r.Email.Trim().ToLowerInvariant());
 
         if (u is null || new PasswordHasher<User>().VerifyHashedPassword(u, u.PasswordHash, r.Password) == PasswordVerificationResult.Failed)
             return Unauthorized(); 
@@ -35,4 +36,4 @@ public sealed class AuthController(UsersDbContext db, IConfiguration cfg) : Cont
         return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(t) });
     }
 }
-public sealed record LoginRequest(string Email, string Password);
+public sealed record LoginRequest([Required, EmailAddress] string Email, [Required] string Password);

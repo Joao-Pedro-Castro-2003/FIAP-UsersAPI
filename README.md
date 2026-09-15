@@ -1,92 +1,27 @@
-# FIAP Cloud Games - UsersAPI
+# UsersAPI — Fase 3
 
-Microsservico responsavel pelo cadastro de usuarios, autenticacao com JWT e controle basico de autorizacao da plataforma Cloud Games.
+Cadastro de usuários comuns, login JWT e evento UserCreatedEvent. Banco SQLite e hash de senha com PasswordHasher. O cadastro público rejeita isAdmin=true.
 
-Este servico faz parte do Tech Challenge Fase 2 da FIAP e foi separado do monolito original para compor uma arquitetura baseada em microsservicos.
+O administrador inicial é criado somente em banco vazio, usando Bootstrap__AdminEmail e Bootstrap__AdminPassword. Esses valores são gerados pelo script de orquestração e não são versionados.
 
-## Responsabilidades
+## Configuração
 
-- Cadastrar usuarios comuns e administradores.
-- Autenticar usuarios.
-- Gerar token JWT.
-- Proteger rotas administrativas.
-- Publicar evento de usuario criado para o RabbitMQ.
+| Variável | Uso |
+|---|---|
+| ConnectionStrings__Db | Ex.: Data Source=/app/data/users.db |
+| Jwt__Key | Chave de pelo menos 32 bytes, compartilhada com Kong e CatalogAPI |
+| Jwt__Issuer / Jwt__Audience | FiapCloudGames no ambiente local |
+| RabbitMq__Host / RabbitMq__Username / RabbitMq__Password | Conexão configurável |
+| Bootstrap__AdminEmail / Bootstrap__AdminPassword | Admin inicial; senha de pelo menos 12 caracteres |
 
-## Tecnologias
+Métricas em /metrics e logs JSON no console. Liveness em /health/live e consulta do SQLite em /health/ready. Esses caminhos são internos e não publicados pelo gateway.
 
-- .NET 8
-- ASP.NET Core Web API
-- Entity Framework Core
-- SQLite
-- JWT Bearer Authentication
-- RabbitMQ
-- MassTransit
-- Swagger
-- Docker
+## Executar
 
-## Principais rotas
+Use o [guia central de orquestração](../FIAP-CloudGames-Orchestration/README.md) no workspace. No GitHub, consulte o repositório FIAP-CloudGames-Orchestration na mesma conta.
 
-| Metodo | Rota | Descricao |
-| --- | --- | --- |
-| POST | `/api/users` | Cadastra um novo usuario |
-| GET | `/api/users/{id}` | Consulta usuario por id, rota restrita a admin |
-| POST | `/api/auth/login` | Autentica usuario e retorna token JWT |
-
-## Exemplo de cadastro
-
-```json
-{
-  "name": "Admin",
-  "email": "admin@fiap.com",
-  "password": "123456",
-  "isAdmin": true
-}
+```powershell
+dotnet test UsersAPI.sln
 ```
 
-Para usuario comum, envie `isAdmin` como `false`.
-
-## Evento publicado
-
-Ao cadastrar um usuario, a API publica o evento:
-
-```text
-UserCreatedEvent
-```
-
-Esse evento e consumido pela NotificationsAPI para simular o envio de e-mail de boas-vindas.
-
-## Variaveis de ambiente
-
-| Variavel | Descricao | Exemplo |
-| --- | --- | --- |
-| `ASPNETCORE_ENVIRONMENT` | Ambiente da aplicacao | `Development` |
-| `ConnectionStrings__DefaultConnection` | String de conexao do SQLite | `Data Source=/data/users.db` |
-| `Jwt__Key` | Chave usada para assinar o token JWT | `fiap-cloud-games-secret-key` |
-| `Jwt__Issuer` | Emissor do token JWT | `FIAP.CloudGames` |
-| `Jwt__Audience` | Audiencia do token JWT | `FIAP.CloudGames` |
-| `RabbitMq__Host` | Host do RabbitMQ | `rabbitmq` |
-| `RabbitMq__Username` | Usuario do RabbitMQ | `guest` |
-| `RabbitMq__Password` | Senha do RabbitMQ | `guest` |
-
-## Executando localmente
-
-```bash
-dotnet restore
-dotnet run --project src/UsersAPI/UsersAPI.csproj
-```
-
-Swagger:
-
-```text
-http://localhost:5001/swagger
-```
-
-## Executando com Docker
-
-```bash
-docker build -t fiap-users-api:latest .
-docker run -p 5001:8080 fiap-users-api:latest
-```
-
-No projeto completo, a execucao recomendada e pelo repositorio de orquestracao, usando Docker Compose ou Kubernetes.
-
+Os fontes Data são versionados; arquivos *.db e auxiliares SQLite são ignorados. A criação de um banco vazio não recupera os registros antigos.
