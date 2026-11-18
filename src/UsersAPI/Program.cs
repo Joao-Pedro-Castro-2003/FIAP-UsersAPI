@@ -14,11 +14,19 @@ b.Services.AddControllers();
 b.Services.AddEndpointsApiExplorer();
 b.Services.AddSwaggerGen();
 b.Services.AddProblemDetails();
-b.Services.AddDbContext<UsersDbContext>(o => o.UseSqlite(b.Configuration.GetConnectionString("Db")));
+var postgres = b.Configuration["Database:Provider"] == "PostgreSQL";
+var connection = b.Configuration.GetConnectionString("Db") ?? throw new InvalidOperationException("ConnectionStrings:Db ausente");
+b.Services.AddDbContext<UsersDbContext>(options =>
+{
+    if (postgres)
+        options.UseNpgsql(connection);
+    else
+        options.UseSqlite(connection);
+});
 b.Services.AddMassTransit(x => x.UsingRabbitMq((c, q) => {
     q.Host(b.Configuration["RabbitMq:Host"] ?? "localhost", h => {
-        h.Username(b.Configuration["RabbitMq:Username"] ?? "guest");
-        h.Password(b.Configuration["RabbitMq:Password"] ?? "guest");
+        h.Username(b.Configuration["RabbitMq:Username"] ?? throw new InvalidOperationException("Configuração RabbitMQ ausente"));
+        h.Password(b.Configuration["RabbitMq:Password"] ?? throw new InvalidOperationException("Configuração RabbitMQ ausente"));
     });
     q.ConfigureEndpoints(c);
 }));
@@ -35,6 +43,11 @@ var app = b.Build();
 Directory.CreateDirectory("data");
 using (var scope = app.Services.CreateScope()) {
     var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+    if (postgres)
+    {
+        db.Database.OpenConnection();
+        db.Database.ExecuteSqlRaw("SELECT pg_advisory_lock(42001)");
+    }
     db.Database.EnsureCreated();
     // Bootstrap only a fresh database. Public signup cannot grant Admin.
     var email = b.Configuration["Bootstrap:AdminEmail"];
@@ -46,6 +59,8 @@ using (var scope = app.Services.CreateScope()) {
         db.Users.Add(admin);
         db.SaveChanges();
     }
+    if (postgres)
+        db.Database.ExecuteSqlRaw("SELECT pg_advisory_unlock(42001)");
 }
 app.UseRouting();
 app.UseHttpMetrics();
